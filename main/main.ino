@@ -95,9 +95,7 @@ void loop() {
   double freq =
     bin * SAMPLING_FREQUENCY / SAMPLES;
 
-  Serial.print("F0: ");
-  Serial.print(freq, 1);
-  Serial.println(" Hz");
+  Serial.println(freq, 1);
 
   delay(30);
 }
