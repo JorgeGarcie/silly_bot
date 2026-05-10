@@ -25,10 +25,24 @@
 
 Servo wheelRight;
 Servo wheelLeft;
+Servo poopServo;
 Adafruit_NeoPixel pixels(NUM_PIXELS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 const int STOP_RIGHT = 92;
 const int STOP_LEFT  = 90;
+
+// Poop servo (positional, on D11)
+const int POOP_PIN     = 10;
+const int POOP_REST    = 0;
+const int POOP_DEPLOY  = 62;
+const unsigned long POOP_HOLD_MS = 800;
+
+unsigned long poopDeployedAt = 0;
+bool poopActive = false;
+
+// Tracks which light pattern is currently on (0 = off). Repeating the
+// same code toggles it back off; a different light code replaces it.
+int activeLight = 0;
 
 void moveForward() {
   wheelRight.write(180);
@@ -90,15 +104,41 @@ void frown() {
   arc(RING_OFFSET % NUM_PIXELS, NUM_PIXELS / 3, pixels.Color(0, 100, 255));
 }
 
+// POOP: kick the D11 servo to POOP_DEPLOY, then back to POOP_REST after
+// POOP_HOLD_MS. Non-blocking: state retracted by tickPoop() in loop().
+void poop() {
+  poopServo.write(POOP_DEPLOY);
+  poopDeployedAt = millis();
+  poopActive = true;
+}
+
+void tickPoop() {
+  if (poopActive && (millis() - poopDeployedAt >= POOP_HOLD_MS)) {
+    poopServo.write(POOP_REST);
+    poopActive = false;
+  }
+}
+
 void dispatch(int code) {
   switch (code) {
     case 1: moveForward(); break;
     case 2: moveBack();    break;
     case 3: turnLeft();    break;
     case 4: turnRight();   break;
-    case 6: wow();         break;
-    case 7: smile();       break;
-    case 8: frown();       break;
+    case 5: poop();        break;
+    case 6:
+    case 7:
+    case 8:
+      if (activeLight == code) {
+        pixelsOff();
+        activeLight = 0;
+      } else {
+        if (code == 6) wow();
+        else if (code == 7) smile();
+        else frown();
+        activeLight = code;
+      }
+      break;
     case 100: stopAll();   break;
     default: /* unknown — ignore */ break;
   }
@@ -108,6 +148,8 @@ void setup() {
   Serial.begin(115200);
   wheelRight.attach(8);
   wheelLeft.attach(9);
+  poopServo.attach(POOP_PIN);
+  poopServo.write(POOP_REST);
   stopAll();
   pixels.begin();
   pixels.setBrightness(80);  // 0-255; keep modest to avoid USB brown-out
@@ -122,4 +164,5 @@ void loop() {
       dispatch(code);
     }
   }
+  tickPoop();
 }
